@@ -1,4 +1,3 @@
-# typescriptproject
 
 We are going to create a project that parses a very simple markdown format while the user types into a text area and displays the resulting web page alongside it.
 
@@ -136,7 +135,6 @@ enum TagType {
     Header3,
     HorizontalRule
 }
-
 we also know that we need to translate between these tags and their equivalent opening and closing HTML tags. The way that we are going to do this is to map tagType to an equivalent HTML tag. 
 To do this, we are going to create a class that has the sole responsibility of handling this mapping for us. The following code shows this:
 
@@ -224,7 +222,7 @@ class TagTypeToHtml {
         if (tag !== null) {
             return `${openingTagPattern}${tag}>`;
         }
-    return `${openingTagPattern}p>`;
+        return `${openingTagPattern}p>`;
     }
 }
 
@@ -342,7 +340,7 @@ class ParagraphVisitor extends VisitorBase {
 class HorizontalRuleVisitor extends VisitorBase {
     constructor() {
         super(TagType.HorizontalRule, new TagTypeToHtml());
-}
+    }
 }
 
 At first, this code may seem like overkill, but it serves a purpose. If we take Header1Visitor, for instance, we have a class that has the single responsibility of taking the current line and adding it to our markdown document wrapped in H1 tags.
@@ -424,10 +422,29 @@ protected CanHandle(request: ParseElement): boolean {
     }
     return split[0];
 }
-
 Here, we are using our parser to build a tuple where the first parameter states whether or not the tag was present, and the second parameter contains the text without the tag if the tag was present. 
 If the markdown tag was present in our string, we call the Accept method on our Visitable implementation.
 
+Here, we are using our parser to build a tuple where the first parameter states whether or not the tag was present,
+ and the second parameter contains the text without the tag if the tag was present. If the markdown tag was present in our string, 
+we call the Accept method on our Visitable implementation
+
+class ParseChainHandler extends Handler<ParseElement> {
+    private readonly visitable : IVisitable = new Visitable();
+    protected CanHandle(request: ParseElement): boolean {
+        let split = new LineParser().Parse(request.CurrentLine, this.tagType);
+        if (split[0]){
+            request.CurrentLine = split[1];
+            this.visitable.Accept(this.visitor, request, this.document);
+        }
+        return split[0];
+    }
+    constructor(private readonly document : IMarkdownDocument, 
+        private readonly tagType : string, 
+        private readonly visitor : IVisitor) {
+        super();
+    }
+}
 
 We have a special case that we need to handle. 
 We know that the paragraph has no tag associated with it—if there are no matches through the rest of the chain, by default, it's a paragraph. 
@@ -471,6 +488,7 @@ class HorizontalRuleHandler extends ParseChainHandler {
     }
 }
 
+
 We now have a route through from the tag, for example, ---,to the appropriate visitor. 
 We have now linked our chain-of-responsibility pattern to our visitor pattern. 
 We have one final thing that we need to do: set up the chain. To do this, let's use a separate class that builds our chain:
@@ -491,6 +509,7 @@ class ChainOfResponsibilityFactory {
         return header1;
     }
 }
+
 
 This simple-looking method accomplishes a lot for us. The first few statements initialize the chain-of-responsibility handlers for us; first for the headers, then for the horizontal rule, and finally for the paragraph handler.
  Remembering that this is only part of what we need to do here, we then go through the headers and the horizontal rule and set up the next item in the chain. 
@@ -514,6 +533,8 @@ class Markdown {
         return document.Get();
     }
 }
+
+
 
 Now that we can generate our HTML content, we have one change left to do. We are going to revisit the HtmlHandler method and change it so that it calls our ToHtml markdown method.
 At the same time, we are going to address an issue with our original implementation where refreshing the page loses our content until we press a key. To handle this, we are going to add a window.onload event handler
@@ -542,6 +563,7 @@ class HtmlHandler {
             markdownOutput.innerHTML = "<p></p>";
     }
 }
+
 
 Now, when we run our application, it displays the rendered HTML content, even when we refresh our page.
  We have successfully created a simple markdown editor that satisfies the points that we laid out in our requirements, gathering stage.
